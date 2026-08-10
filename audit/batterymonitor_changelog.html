@@ -308,6 +308,33 @@
     </ul>
   </div>
 
+  <h2>本次修改（v1.0.6 — 文档轮：截图归置 screenshots/ 子目录）</h2>
+  <div class="card">
+    <div class="t">⑱ 将 README 引用的 4 张截图移入 screenshots/ 子目录</div>
+    <ul>
+      <li><b>背景</b>：用户要求 GitHub 介绍页（README）能正常显示截图给下载者看，按惯例截图应放在 <code>screenshots/</code> 文件夹并被 README 以带目录的相对路径引用（GitHub 对仓库内相对路径图片渲染可靠）。</li>
+      <li><b>移动</b>：在镜像仓根新建 <code>screenshots/</code>，用 <code>git mv</code> 把 4 张 PNG 从仓库根移入（保留历史），<code>git status --porcelain</code> 显示 4 条 <code>R</code>（rename）：
+        <ul>
+          <li><code>插件菜单.png</code> 19,390 B → <code>screenshots/插件菜单.png</code></li>
+          <li><code>电量图表.png</code> 21,551 B → <code>screenshots/电量图表.png</code></li>
+          <li><code>图表可选时间段.png</code> 26,935 B → <code>screenshots/图表可选时间段.png</code></li>
+          <li><code>休眠及唤醒电量变化追踪.png</code> 104,067 B → <code>screenshots/休眠及唤醒电量变化追踪.png</code></li>
+        </ul>
+      </li>
+      <li><b>README 引用改写</b>：4 处根目录相对引用改为带目录路径：
+        <ul>
+          <li><code>![插件菜单](插件菜单.png)</code> → <code>![插件菜单](screenshots/插件菜单.png)</code></li>
+          <li><code>![电量图表](电量图表.png)</code> → <code>![电量图表](screenshots/电量图表.png)</code></li>
+          <li><code>![图表可选时间段](图表可选时间段.png)</code> → <code>![图表可选时间段](screenshots/图表可选时间段.png)</code></li>
+          <li><code>![休眠及唤醒电量变化追踪](休眠及唤醒电量变化追踪.png)</code> → <code>![休眠及唤醒电量变化追踪](screenshots/休眠及唤醒电量变化追踪.png)</code></li>
+        </ul>
+      </li>
+      <li><b>changelog 同步（硬纪律）</b>：镜像仓 <code>audit/batterymonitor_changelog.html</code> 与源仓 <code>E:\Download\AIWorkshop\koreader\audit/batterymonitor_changelog.html</code> 两副本同步追加本段与历史时间线节点；保持 md5 一致。</li>
+      <li><b>版本</b>：文档轮，<b>不动版本号</b>，仍 v1.0.6。</li>
+      <li><b>校验</b>：<code>git mv</code> 4 条 rename 已暂存；README 4 处引用已改；<code>git push</code> 后需在 GitHub 复核 README 从 <code>screenshots/</code> 渲染 4 张真实截图正常。</li>
+    </ul>
+  </div>
+
   <h2>动机（为什么合并）</h2>
   <div class="card">
     <p>两插件同属电量监控范畴且<b>功能互补不冗余</b>：batterygraph 给"电量怎么走"（连续曲线），sleepwaketracker 给"看书掉多少/待机掉多少"（分段统计）。二者原有"伪整合"但存在脆弱点——sleepwaketracker 用 <code>dofile</code> 硬编码拼路径跨插件加载 <code>graphwidget.lua</code>，一旦以 <b>zip 形态</b>分发，该路径不存在会静默失效。</p>
@@ -335,6 +362,11 @@
 
   <h2>历史时间线</h2>
   <div class="tl">
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.6 — 文档轮：截图归置 screenshots/ 子目录</div>
+      <div class="body"><span class="tag">文档/资产</span>按用户要求把 README 引用的 4 张 KOReader 真实截图从仓库根移入 <code>screenshots/</code> 子目录（<code>git mv</code> 保留历史），并改写 README 4 处图片引用为带目录的相对路径，确保 GitHub 介绍页能正常渲染截图。纯资产归置，无代码/逻辑变化；版本仍 v1.0.6。</div>
+    </div>
     <div class="node">
       <div class="date">2026-08-10</div>
       <div class="title">v1.0.6 — 更正原插件名称（Antigravity→BatteryGraph；补正 sleepwaketracker）</div>
