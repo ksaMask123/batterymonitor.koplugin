@@ -335,6 +335,20 @@
     </ul>
   </div>
 
+  <h2>本次修改（v1.0.6 — 发行轮：GitHub Release + 可下载 zip 安装包）</h2>
+  <div class="card">
+    <div class="t">⑲ 创建 GitHub Release v1.0.6 并上传 batterymonitor.koplugin.zip</div>
+    <ul>
+      <li><b>背景</b>：用户要求发行版提供可供打包下载的 <code>.zip</code> 文件——即在 GitHub Release 中以资产（asset）形式提供安装包，供下载者直接取用。</li>
+      <li><b>打包</b>：用 PowerShell <code>Compress-Archive</code> 把插件 5 个运行时 Lua 文件（<code>main.lua</code> / <code>_meta.lua</code> / <code>batterygraph_ctrl.lua</code> / <code>sleepwake_ctrl.lua</code> / <code>graphwidget.lua</code>，源真相与镜像仓字节一致）连同详版 <code>README.md</code> 包入顶层 <code>batterymonitor.koplugin/</code> 目录，产出 <code>batterymonitor.koplugin.zip</code>（30,677 B）。内部结构符合 README「方式 B」要求的"保持内部目录结构、不让 main.lua 裸露在 zip 根"。</li>
+      <li><b>创建 Release</b>：<code>gh release create v1.0.6</code>（仓库 <code>ksaMask123/batterymonitor.koplugin</code>），标题「BatteryMonitor v1.0.6」，附 zip 资产；tag <code>v1.0.6</code> 指向 master HEAD（<code>2af29c5</code>）。Release 正文给出两种安装方式（解压目录 / 改名 <code>.koplugin</code>）。</li>
+      <li><b>资产确认</b>：<code>gh release view</code> 经 API 复核——name=<code>batterymonitor.koplugin.zip</code>、size=30677、contentType=<code>application/zip</code>、state=<code>uploaded</code>；下载地址 <code>https://github.com/ksaMask123/batterymonitor.koplugin/releases/download/v1.0.6/batterymonitor.koplugin.zip</code>。</li>
+      <li><b>changelog 同步（硬纪律）</b>：镜像仓 <code>audit/batterymonitor_changelog.html</code> 与源仓 <code>E:\Download\AIWorkshop\koreader\audit/batterymonitor_changelog.html</code> 两副本同步追加本段与历史时间线节点；保持 md5 一致。</li>
+      <li><b>版本</b>：发行轮，<b>不动版本号</b>，仍 v1.0.6（无 Lua 代码变更，仅新增 GitHub Release 资产）。</li>
+      <li><b>校验</b>：Release 资产已 uploaded；仓库根（README.md / _meta.lua 等）与 <code>screenshots/</code> 目录均含对应文件（4 张图 raw URL 编码正确）；zip 内部用 <code>tar -tf</code> 确认顶层为 <code>batterymonitor.koplugin/</code> 且 6 文件齐全。</li>
+    </ul>
+  </div>
+
   <h2>动机（为什么合并）</h2>
   <div class="card">
     <p>两插件同属电量监控范畴且<b>功能互补不冗余</b>：batterygraph 给"电量怎么走"（连续曲线），sleepwaketracker 给"看书掉多少/待机掉多少"（分段统计）。二者原有"伪整合"但存在脆弱点——sleepwaketracker 用 <code>dofile</code> 硬编码拼路径跨插件加载 <code>graphwidget.lua</code>，一旦以 <b>zip 形态</b>分发，该路径不存在会静默失效。</p>
@@ -362,6 +376,11 @@
 
   <h2>历史时间线</h2>
   <div class="tl">
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.6 — 发行轮：GitHub Release + 可下载 zip 安装包</div>
+      <div class="body"><span class="tag">发行</span>创建 GitHub Release <code>v1.0.6</code> 并上传 <code>batterymonitor.koplugin.zip</code>（30,677 B，含 5 个运行时 Lua + 详版 README，顶层 <code>batterymonitor.koplugin/</code> 目录结构）。下载地址见 Release 资产。纯发行轮，无代码/逻辑变更；版本仍 v1.0.6。</div>
+    </div>
     <div class="node">
       <div class="date">2026-08-10</div>
       <div class="title">v1.0.6 — 文档轮：截图归置 screenshots/ 子目录</div>
