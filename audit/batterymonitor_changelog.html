@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电量监测 (BatteryMonitor) 插件更新日志</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --panel2:#f0f2f5; --border:#dfe3e8;
+    --text:#1f2329; --muted:#6b7280; --accent:#0a7d5a; --accent2:#1a56c4;
+    --warn:#b7791f; --ok:#2f8f4e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI",-apple-system,"Microsoft YaHei",sans-serif;line-height:1.65;padding:32px 18px}
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:24px;color:var(--text);margin:0 0 4px;font-weight:600}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+  .meta{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px}
+  .chip{background:var(--panel2);border:1px solid var(--border);border-radius:6px;
+    padding:6px 12px;font-size:12px;color:var(--muted)}
+  .chip b{color:var(--text);font-weight:600}
+  h2{font-size:17px;color:var(--accent);margin:28px 0 12px;border-left:3px solid var(--accent);
+    padding-left:10px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:14px}
+  .card .t{color:var(--accent2);font-weight:600;font-size:14px;margin-bottom:6px}
+  .card p{margin:6px 0;font-size:14px}
+  code{background:#eef1f4;border:1px solid var(--border);border-radius:4px;
+    padding:1px 6px;font-family:"Cascadia Code",Consolas,monospace;font-size:13px;color:#a33}
+  pre{background:#f3f5f8;border:1px solid var(--border);border-radius:6px;padding:12px 14px;
+    overflow-x:auto;font-family:"Cascadia Code",Consolas,monospace;font-size:12.5px;color:var(--text)}
+  .tl{position:relative;margin-left:8px;padding-left:26px;border-left:2px solid var(--border)}
+  .tl .node{position:relative;margin-bottom:22px}
+  .tl .node::before{content:"";position:absolute;left:-33px;top:4px;width:12px;height:12px;
+    border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+  .tl .date{color:var(--accent);font-size:13px;font-weight:600}
+  .tl .title{color:var(--text);font-size:15px;font-weight:600;margin:2px 0 6px}
+  .tl .body{font-size:13.5px;color:var(--text)}
+  .tag{display:inline-block;background:rgba(10,125,90,.12);color:var(--accent);
+    border:1px solid rgba(10,125,90,.35);border-radius:4px;padding:1px 8px;font-size:11px;margin-right:6px}
+  .badge{display:inline-block;border-radius:4px;padding:2px 10px;font-size:12px;font-weight:600}
+  .badge.ok{background:rgba(47,143,78,.12);color:var(--ok);border:1px solid rgba(47,143,78,.35)}
+  .badge.pending{background:rgba(183,121,31,.12);color:var(--warn);border:1px solid rgba(183,121,31,.35)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  td,th{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--accent2);font-weight:600}
+  td.k{color:var(--muted);white-space:nowrap;width:130px}
+  footer{color:var(--muted);font-size:11.5px;margin-top:30px;text-align:center}
+  .diff-old{color:#c0392b}
+  .diff-new{color:#2f8f4e}
+  ul{margin:6px 0;padding-left:20px}
+  li{font-size:13.5px;margin:3px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>电量监测 (BatteryMonitor) · 更新日志</h1>
+  <div class="sub">batterymonitor.koplugin · 由 batterygraph（电量曲线）+ sleepwaketracker（休眠/唤醒追踪）合并而成</div>
+  <div class="meta">
+    <span class="chip">当前版本 <b>v1.0.6（更正原插件名）</b></span>
+    <span class="chip">合并来源 <b>batterygraph v1.2.0 + sleepwaketracker v1.0.0</b></span>
+    <span class="chip">本次修改文件 <b>8 个（新增 overlay.lua，改写 main/_meta/menu + batterygraph_ctrl）</b></span>
+    <span class="chip">修改日期 <b>2026-08-10</b></span>
+  </div>
+
+  <h2>本次修改（新建 v1.0.0 合并版）</h2>
+  <div class="card">
+    <div class="t">① 新建 main.lua —— 单一插件编排器</div>
+    <p>将原两插件的入口合并为唯一插件对象 <code>BatteryMonitor</code>（WidgetContainer），职责：</p>
+    <ul>
+      <li>注册<b>单一主菜单</b>「电量监测 ▸ 电量曲线 / 休眠/唤醒记录 / 关于」，归入 <code>more_tools</code> 排序；</li>
+      <li>持有两个子控制器 <code>self.battery</code>（电量采样）、<code>self.sleepwake</code>（休眠/唤醒），并以 <code>{ui=self.ui, _monitor=self}</code> 实例化；</li>
+      <li>暴露 <code>_G.BatteryMonitorInstance</code>（始终指向常驻实例）；</li>
+      <li>接收生命周期事件后<b>委派</b>给子控制器：onSuspend / onResume / onCharging / onNotCharging / onEnterStandby / onLeaveStandby / onCloseDocument；</li>
+      <li>注册两个 Dispatcher 动作：<code>batterymonitor_graph</code>(ShowBatteryGraph)、<code>batterymonitor_sleepwake_today</code>(ShowSleepWakeToday)。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="t">② 改写 batterygraph_ctrl.lua —— 去"插件化"，仅留采样能力</div>
+    <ul>
+      <li>删除 <code>_G.BatteryGraphInstance = self</code> 全局暴露；</li>
+      <li>删除 <code>self:onDispatcherRegisterActions()</code> 与"重试注册主菜单"整块；</li>
+      <li>改写 <code>onCloseDocument</code>：仅 <code>unschedule(record_task)</code>，不再清理全局引用（全局由主插件管理）。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="t">③ 改写 sleepwake_ctrl.lua —— 去"插件化"，仅留追踪能力</div>
+    <ul>
+      <li>删除 <code>_G.SleepWakeTrackerInstance = self</code> 全局暴露；</li>
+      <li>删除 <code>self:onDispatcherRegisterActions()</code> 与"重试注册主菜单"整块；</li>
+      <li><b>消除 dofile 跨插件雷</b>：<code>openBatteryGraph()</code> 由 <code>dofile(插件目录/graphwidget.lua)</code> 改为 <code>self._monitor:onShowBatteryGraph()</code> 进程内委派；</li>
+      <li><code>addToMainMenu()</code> 改为 <code>getMenuSubItems()</code>，仅向主插件返回子菜单表（今日/昨日/历史/数据管理/关于）。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="t">④ 改写 graphwidget.lua —— 反向跨引用对齐</div>
+    <p>图内"打开休眠/唤醒追踪"菜单由 <code>_G.SleepWakeTrackerInstance:onShowSleepWakeToday()</code> 改为：</p>
+    <pre><span class="diff-old">- if _G.SleepWakeTrackerInstance then
+-     _G.SleepWakeTrackerInstance:onShowSleepWakeToday()</span>
+<span class="diff-new">+ if _G.BatteryMonitorInstance then
++     _G.BatteryMonitorInstance:onShowSleepWakeToday()</span></pre>
+  </div>
+  <div class="card">
+    <div class="t">⑤ 新增 _meta.lua / README.md</div>
+    <p><code>_meta.lua</code>：fullname="电量监测"、version="1.0.0"、作者注明合并来源。<code>README.md</code>：合并说明、安装、使用、数据位置、回滚。</p>
+  </div>
+
+  <h2>本次修改（v1.0.1 — 视图模式重构）</h2>
+  <div class="card">
+    <div class="t">⑥ 改写 graphwidget.lua —— 周期窗口 → 时间窗</div>
+    <ul>
+      <li><b>移除</b> <code>cycle_discharge</code> / <code>cycle_charge</code> 两种"当前周期"视图（依赖 <code>is_charging</code> 跳变点定位起点，硬件状态抖动易错且信息冗余）；</li>
+      <li><b>新增</b> 时间窗视图：<code>today</code>(当天 0 点起) / <code>7d</code> / <code>30d</code>(默认) / <code>90d</code> / <code>180d</code> / <code>365d</code>（近 N 天）；</li>
+      <li>重构 <code>getFilteredHistory()</code>（纯时间窗 cutoff，去掉跳变点回溯）、<code>getModeTitle()</code>、<code>showViewMenu()</code>（菜单项替换）、<code>switchMode()</code>（去掉 period_days 写入）；</li>
+      <li><b>保留</b> 机制 A：充/放电灰阶着色（黑=放电、灰=充电）与图例不变，E-ink 友好。</li>
+    </ul>
+    <p>动机：周期视图信息冗余（着色已表达充放电），且依赖 is_charging 跳变脆弱；时间窗更直白、小屏可读，并消除跳变点依赖。</p>
+  </div>
+  <div class="card">
+    <div class="t">⑦ 改写 batterygraph_ctrl.lua —— 视图模式读取对齐</div>
+    <ul>
+      <li><code>onShowBatteryGraph()</code> 默认 <code>view_mode</code> 由 <code>"cycle_discharge"</code> 改为 <code>"30d"</code>；</li>
+      <li>移除 <code>period_days</code> 读取与传参，<code>on_mode_change</code> 仅保存 <code>view_mode</code>；</li>
+      <li>旧存档若残留 <code>"cycle_discharge"</code>，widget 会优雅回退到 30d（无崩溃）。</li>
+    </ul>
+  </div>
+
+  <h2>本次修改（v1.0.2 — 健壮性加固 P0–P3）</h2>
+  <div class="card">
+    <div class="t">P0 去除 emoji / 特殊字符（KPW3 必现乱码）</div>
+    <ul>
+      <li><code>sleepwake_ctrl.lua</code> 4 处：<code>📊 查看电量图表</code> → <code>查看电量图表</code>；<code>☀%2</code> → <code>唤醒%2</code>；<code>⚠异常</code> → <code>[异常]</code>。</li>
+      <li>KPW3 默认 cfont 不含这些字形，原先会渲染成豆腐块（□）；纯灰度/文本方案与 KPW3 黑屏诉求一致。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="t">P1 修复双实例历史覆盖丢点（数据完整性）</div>
+    <ul>
+      <li>新增 <code>BatteryGraph:mergeHistory(a, b)</code>：把"内存历史 a"与"磁盘历史 b"按 <code>ts</code> 去重合并（磁盘先入、内存后入，使本实例未落盘最新点优先胜出）。</li>
+      <li><code>recordPoint()</code> 落盘前用临时 <code>LuaSettings:open</code> 重新读磁盘历史，与内存历史合并后再 append——消除 FileManager / Reader 双实例互相用陈旧内存覆盖对方已落盘点（典型：阅读期间采的点，关书回书架被覆盖）。</li>
+      <li>注意：不能用 <code>self.settings:readSetting</code> 代替，因其只读本实例内存而非磁盘另一实例的写入。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="t">P2 清理隐患（死代码 + CSV 导入状态重载）</div>
+    <ul>
+      <li>删除 <code>batterygraph_ctrl.lua</code> 死代码 <code>onDispatcherRegisterActions</code> / <code>addToMainMenu</code>（<code>main.lua</code> 从不调用）及无用 <code>require("dispatcher")</code>；</li>
+      <li>删除 <code>sleepwake_ctrl.lua</code> 死代码 <code>onDispatcherRegisterActions</code> 及无用 <code>require("dispatcher")</code>；</li>
+      <li>CSV 导入（追加 / 覆盖）后由置 nil 改为 <code>reloadLastEvent()</code>，避免下次真实事件被当"新"事件产生连续同类型行；"删今日日志"同样改为 <code>reloadLastEvent()</code>。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="t">P3 边界打磨</div>
+    <ul>
+      <li><code>secondsToDuration</code> 负时长改为钳到 <code>0</code>（原 <code>+86400</code> 语义错误）；</li>
+      <li><code>safeParseBattery</code> 拒绝 <code>0</code> 读取（与 <code>-1</code> 哨兵一致，避免污染统计）；</li>
+      <li><code>graphwidget</code> 跨跳转优先用 <code>self._monitor</code>（构造时由 <code>batterygraph_ctrl</code> 传入），全局 <code>_G.BatteryMonitorInstance</code> 仅作兜底，避免失效实例；</li>
+      <li><code>onResume</code> 的 wake 电量刷新增加 <code>refreshed</code> 标记，避免 15s 冗余读盘（<code>updateLastEventBattery</code> 本身已幂等、仅重写前缀行，不丢数据，本次仅去冗余）。</li>
+    </ul>
+  </div>
+
+  <h2>本次修改（v1.1.0 — 新增折线 + 状态叠加视图 overlay.lua）</h2>
+  <div class="card">
+    <div class="t">⑧ 新增 overlay.lua —— 折线 + 休眠/充电时段底色着色</div>
+    <ul>
+      <li>复用 graphwidget 的折线渲染与坐标/时间窗机制，新增<b>底色着色</b>：休眠时段描<b>浅灰实色块</b>（整段绘图区高度），充电时段描<b>灰色 45° 斜纹</b>；</li>
+      <li><b>纯灰度、不依赖颜色</b>（KPW3 16 级灰阶）：折线统一黑色实线，状态完全由底色区分，解决彩色在黑白屏无意义的问题；</li>
+      <li>充电段着色源自电量历史 <code>is_charging</code> 连续段；休眠段着色源自 sleepwake 事件 <code>SLEEP/WAKE</code> 配对（末尾未闭合 SLEEP 延伸到此刻）；</li>
+      <li><code>getFilteredSleepIntervals()</code> 与 <code>getFilteredHistory()</code> 共用同一时间窗 cutoff，切换「今天/近 N 天」时底色与折线同步；</li>
+      <li>图例改为<b>两行纯文本</b>（折线 黑=电量 / 底色 浅灰=休眠 斜纹=充电），并将视图菜单勾选标记由 <code>✓</code> 改为纯 ASCII <code>&gt;</code>，避免 KPW3 cfont 缺失字形渲染成豆腐块（延续 v1.0.2 P0 纪律）。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="t">⑨ 挂接 overlay 到菜单与控制器</div>
+    <ul>
+      <li><code>main.lua</code> 主菜单「电量监测」新增子项 <b>「折线 + 状态叠加」</b>，并新增委派方法 <code>BatteryMonitor:onShowOverlay()</code>；</li>
+      <li><code>batterygraph_ctrl.lua</code> 新增 <code>onShowOverlay()</code>：从 <code>self._monitor.sleepwake:readAllEvents()</code> 配对出休眠时段，再 <code>require("overlay")</code> 展示；复用 <code>_monitor</code> 进程内引用，无 dofile 雷。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="t">回滚保障</div>
+    <ul>
+      <li>开工前已对 v1.0.2 基线完整快照至 <code>Backup/batterymonitor_v1.0.2/batterymonitor.koplugin/</code>。若叠加视图效果不满意，可一键还原到合并加固版（overlay.lua 与菜单项一并移除）。</li>
+    </ul>
+  </div>
+
+  <h2>本次修改（v1.1.1 — 修复「折线 + 状态叠加」点击崩溃）</h2>
+  <div class="card">
+    <div class="t">⑩ 修复 overlay.lua 充电斜纹绘制崩溃（P0 运行期崩溃）</div>
+    <ul>
+      <li><b>现象</b>：点击主菜单「折线 + 状态叠加」打开叠加视图即崩溃，KOReader 退出；crash.log 报 <code>overlay.lua:78: attempt to perform arithmetic on 'struct Color8' and 'number'</code>。</li>
+      <li><b>根因</b>：充电时段斜纹函数 <code>drawHatch(bb, x0, x1, y_top, y_bottom, color)</code> 的调用（第 139 行）漏传首个参数 <code>bb</code>（Blitbuffer 对象）。Lua 实参向左对齐后，<code>bb</code> 收到 number、<code>y_bottom</code> 收到 <code>Blitbuffer.COLOR_GRAY</code>（即 <code>struct Color8</code>），在第 78 行 <code>y_bottom - y_top</code> 处对颜色结构做算术运算 → 崩溃。</li>
+      <li><b>修复</b>：调用处补回 <code>bb</code> 首参，参数与签名对齐：<br>
+        <pre><span class="diff-old">- drawHatch(tx(history.ts[i]), tx(history.ts[j - 1]), graph_y, graph_y + graph_h, Blitbuffer.COLOR_GRAY)</span>
+<span class="diff-new">+ drawHatch(bb, tx(history.ts[i]), tx(history.ts[j - 1]), graph_y, graph_y + graph_h, Blitbuffer.COLOR_GRAY)</span></pre>
+      </li>
+      <li><b>校验</b>：LuaJIT <code>loadfile()</code> 编译 overlay.lua 通过（SYNTAX OK）；参数修复后 <code>drawHatch</code> 内部 <code>drawLine(bb, ...)</code> 的 <code>bb</code> 与 <code>color</code> 均取值正确。仍待真机验证（本环境无 KOReader 运行时）。</li>
+      <li><b>影响</b>：仅改动 overlay.lua 单处调用与一个版本号；v1.1.0 的叠加视图其余逻辑（休眠浅灰实色块、图例、时间窗联动）不受影响，数据传递路径（onShowOverlay → OverlayWidget）已确认正确。</li>
+    </ul>
+  </div>
+
+  <h2>本次修改（回滚 — v1.1.1 → v1.0.2，移除叠加视图）</h2>
+  <div class="card">
+    <div class="t">⑪ 回滚至 v1.0.2 基线（用户对新叠加视图不满意）</div>
+    <ul>
+      <li><b>决策</b>：用户反馈对「折线 + 状态叠加」新视图效果不满意，要求回滚至 v1.0.2（合并加固版，无叠加视图）。</li>
+      <li><b>操作</b>：用此前准备的快照 <code>E:/Download/AIWorkshop/Backup/batterymonitor_v1.0.2/batterymonitor.koplugin/</code> 整体覆盖当前插件目录（覆盖 <code>_meta.lua / batterygraph_ctrl.lua / graphwidget.lua / main.lua / sleepwake_ctrl.lua / README.md / README.upstream.md</code>），并显式删除 <code>overlay.lua</code>（快照中无此文件）。</li>
+      <li><b>校验</b>：Python <code>md5</code> 逐文件比对，当前插件 7 个文件与 v1.0.2 备份<b>逐字节一致</b>；全插件 <code>grep overlay|onShowOverlay</code> 无残留引用；<code>overlay.lua</code> 已确认 ABSENT。</li>
+      <li><b>版本</b>：将滞后未更新的 <code>_meta.lua</code> 版本号由 <code>1.0.0</code> 对齐为 <code>1.0.2</code>，使插件内部版本与文档化版本一致。</li>
+      <li><b>影响</b>：叠加视图（overlay.lua）及其菜单项「折线 + 状态叠加」、<code>onShowOverlay</code> 委派一并移除；v1.0.2 的合并架构、时间窗视图、P0–P3 加固全部保留。数据文件（<code>settings/battery_graph.lua</code>、<code>sleepwaketracker/</code> 日志）未动，历史数据无损。</li>
+      <li><b>后续</b>：v1.1.0/v1.1.1 的相关代码改动（含崩溃修复）已随回滚撤销；若日后重做叠加视图，需重新实现并重新验证。</li>
+    </ul>
+  </div>
+
+  <h2>本次修改（v1.0.3 — 代码审查修复，无新功能）</h2>
+  <div class="card">
+    <div class="t">⑫ 针对电量统计 / 计算 / 展示的审查问题，逐项最小改动修复</div>
+    <ul>
+      <li><b>展示·KPW3 字形</b>（graphwidget）：视图菜单选中标记 <code>✓</code>(U+2713) 改为纯 ASCII <code>&gt;</code>（之前 P0 清 emoji 时漏掉，是功能性标记，缺字形会看不出当前视图）；图例 <code>■</code>(U+25A0) 去除，改为文字「放电(黑) / 充电(灰)」（黑白屏颜色无意义，且避免 cfont 缺字形豆腐块）；菜单分隔 <code>─</code>(U+2500) 置空（这些项本就有 <code>separator=true</code> 画线）。sleepwake 同类分隔行统一处理（<code>separator=true</code> 项文本置空，纯文本分隔行改用 hyphen）。</li>
+      <li><b>展示·时间轴</b>（graphwidget）：x 轴由"取数据首尾自适应拉伸"改为<b>固定时间窗口</b> [cutoff, now]（今天=00:00~now），新增 <code>getWindowBounds()</code>；时间标签与轴边界一致（不再取数据首尾，消除"拉伸占满整宽"误导）；相邻采样间隔 &gt; 6h 视为设备关停/无采样，<b>断开连线</b>显示空缺，不再连成连续假象。</li>
+      <li><b>统计·口径一致</b>（sleepwake）：新增带符号分段净变化累加 <code>active_net_signed / sleep_net_signed</code>，使"活跃/休眠净电量变化"等于各分段电量差之和，与"总计净变化（首尾校准）"口径对齐，界面两处"净变化"不再互相矛盾。</li>
+      <li><b>统计·潜在隐患</b>（batterygraph_ctrl + sleepwake）：<code>getCapacityHW</code> 优先改为 <code>getCapacity</code> 优先（0–100 百分比语义稳定），仅当 <code>getCapacity</code> 不可用时回退 <code>getCapacityHW</code>，避免将来设备返回原始值(&gt;100)触发静默停记。</li>
+      <li><b>效率·降自耗电</b>（batterygraph_ctrl）：<code>recordPoint</code> 增加 <code>merge_disk</code> 参数，周期采样（每 5 分钟）传 <code>false</code> 不再全量重读磁盘+排序，仅边界事件（init/挂起/唤醒/充电视图/关闭文档）合并；<code>onCloseDocument</code> 增加合并落盘，保住阅读实例尚未落盘的电量点。FM/Reader 双实例仍各自落盘，但去掉了每 tick 的 O(n) 读+排序开销。</li>
+      <li><b>效率·算法</b>（sleepwake）：<code>findNextEvent</code> 嵌套扫描 O(n²) 改为一次 O(n) 反向预计算 <code>next_sleep / next_wake</code> 索引数组，逻辑不变。</li>
+      <li><b>清理</b>：删除 graphwidget 未使用的 <code>legend_text</code> 死变量。</li>
+      <li><b>校验</b>：LuaJIT <code>loadfile</code> 对全部 5 个模块编译通过。仍待 KPW3 真机验证（本环境无 KOReader 运行时）；字形渲染需真机确认。</li>
+    </ul>
+  </div>
+
+  <h2>本次修改（v1.0.4 — 折线观感修复，无新功能）</h2>
+  <div class="card">
+    <div class="t">⑬ 针对折线图观感的两项修复</div>
+    <ul>
+      <li><b>充放电统一黑色实线</b>（graphwidget · paintTo）：原充电段使用 <code>Blitbuffer.COLOR_GRAY</code>，在 KPW3 黑白墨水屏上灰色线条过淡、不美观。改为充放电均使用 <code>COLOR_BLACK</code> 实心线，对比度一致、清晰。点击详情仍显示"充电中/放电中"文字状态（不受影响）。</li>
+      <li><b>修复折线"断裂"</b>（graphwidget · paintTo）：移除 v1.0.3 引入的"相邻采样间隔 &gt; 6h 断开连线"逻辑（<code>GAP_THRESHOLD</code>）。该逻辑在设备关停/长时间无采样（如休眠超 6 小时）时不绘制相邻两点之间的连线，导致折线在中间"缺一段"，观感像线条消失/断裂。现改为<b>连续绘制</b>所有相邻点之间的连线。</li>
+      <li><b>图例同步</b>（graphwidget · init）：底部图例由"放电(黑) / 充电(灰)"两条改为单一"电量曲线"，与"充放电统一黑色"一致，避免文字与图形不符、且保持纯 ASCII 无字形风险。</li>
+      <li><b>校验</b>：LuaJIT <code>loadfile</code> 对 graphwidget.lua 编译通过；其余模块未改动。仍待 KPW3 真机验证（本环境无 KOReader 运行时）。</li>
+    </ul>
+    <p style="color:var(--muted);font-size:12.5px">注：连续绘制后，若设备关停数日，折线会以直线段跨接这段空缺——这是为消除"断裂"观感的有意取舍；若你更希望空缺处明确留白，可改回按阈值断线（阈值可调）。</p>
+  </div>
+
+  <h2>本次修改（v1.0.5 — 修复「关于」点击崩溃）</h2>
+  <div class="card">
+    <div class="t">⑭ 修复主菜单「关于」点击即崩溃</div>
+    <ul>
+      <li><b>现象</b>：点击主插件菜单「关于」KOReader 立即崩溃退出。</li>
+      <li><b>根因</b>（crash.log 定位）：<code>main.lua:101: attempt to index global 'InfoMessage' (a nil value)</code>。该回调用 <code>InfoMessage:new{...}</code> 弹窗说明，但 <code>main.lua</code> 顶部从未 <code>require</code> 过 <code>ui/widget/infomessage</code> 模块，导致 <code>InfoMessage</code> 为 <code>nil</code>，调用即崩。子控制器 <code>graphwidget.lua</code> 虽有正确 require，但主文件漏了。</li>
+      <li><b>修复</b>：在 <code>main.lua</code> 顶部 <code>require</code> 列表补 <code>local InfoMessage = require("ui/widget/infomessage")</code>（仅此一行）。</li>
+      <li><b>校验</b>：LuaJIT <code>loadfile</code> 对 main.lua 编译通过。<span class="tag">教训</span>此类"漏 require 导致全局 nil"属运行期崩溃，LuaJIT 语法编译无法捕获，必须依赖 crash.log 的栈定位——今后新增 UI 弹窗需核对所用 widget 是否已在文件中 require。</li>
+    </ul>
+  </div>
+
+  <h2>本次修改（v1.0.6 — 更正原插件名称）</h2>
+  <div class="card">
+    <div class="t">⑮ 更正「关于」与 _meta 中原插件错误英文名</div>
+    <ul>
+      <li><b>问题</b>：<code>main.lua</code> 的「关于」弹窗与 <code>_meta.lua</code> 的 author 字段均将 <b>电量图表</b> 的原插件名误写为 <code>Antigravity</code>。</li>
+      <li><b>更正</b>（用户核实原名）：电量图表原名 <code>BatteryGraph</code>，已两处统一改为 <code>电量图表（BatteryGraph）</code>；休眠/唤醒追踪器原名 <code>sleepwaketracker</code>，在「关于」与 author 字段补正为 <code>休眠/唤醒追踪器（sleepwaketracker）</code>。两处均纯文案更正。</li>
+      <li><b>版本说明</b>：sleepwaketracker 名称补正为同版本（v1.0.6）追加更正，<b>不升版本号</b>，仍视作 v1.0.6。</li>
+      <li><b>影响</b>：纯文案更正，无逻辑、无运行时行为变化。</li>
+      <li><b>校验</b>：LuaJIT <code>loadfile</code> 对 main.lua 编译通过；版本号 <code>1.0.5 → 1.0.6</code>。</li>
+    </ul>
+  </div>
+
+  <h2>动机（为什么合并）</h2>
+  <div class="card">
+    <p>两插件同属电量监控范畴且<b>功能互补不冗余</b>：batterygraph 给"电量怎么走"（连续曲线），sleepwaketracker 给"看书掉多少/待机掉多少"（分段统计）。二者原有"伪整合"但存在脆弱点——sleepwaketracker 用 <code>dofile</code> 硬编码拼路径跨插件加载 <code>graphwidget.lua</code>，一旦以 <b>zip 形态</b>分发，该路径不存在会静默失效。</p>
+    <p>合并后：单一插件、单一菜单、进程内模块调用，<b>彻底消除 dofile 雷</b>，并兼容目录与 zip 两种形态。数据文件保持原路径（<code>settings/battery_graph.lua</code> 与 <code>&lt;data_dir&gt;/sleepwaketracker/</code>），历史数据无损。</p>
+  </div>
+
+  <h2>影响范围</h2>
+  <table>
+    <tr><th>维度</th><th>说明</th></tr>
+    <tr><td class="k">运行时行为</td><td>合并后行为与两插件并存时一致：电量仍按 1% 阈值/1 小时/状态变化采样；休眠唤醒仍记录事件。无逻辑退化。</td></tr>
+    <tr><td class="k">菜单</td><td>原两个独立菜单项合并为一个「电量监测」父菜单 + 两个子入口，不再出现重复菜单。</td></tr>
+    <tr><td class="k">事件追踪</td><td>生命周期事件由主插件统一接收后委派，子控制器 <code>onSuspend/onResume/...</code> 仍被调用，追踪不中断。</td></tr>
+    <tr><td class="k">跨插件引用</td><td>双向跳转（图→事件、事件→图）改为进程内委派 / <code>_G.BatteryMonitorInstance</code>，zip 形态下不再失效。</td></tr>
+    <tr><td class="k">数据兼容</td><td>复用原有历史与日志文件，不新建数据 schema，旧数据可直接读取。</td></tr>
+    <tr><td class="k">风险点</td><td>合并前原两插件已完整备份至 <code>Backup/plugins/</code>，可一键回滚。</td></tr>
+  </table>
+
+  <h2>校验结果</h2>
+  <div class="card">
+    <p><span class="badge ok">已通过</span> <b>LuaJIT 语法校验</b>：对 <code>main.lua / _meta.lua / batterygraph_ctrl.lua / sleepwake_ctrl.lua / graphwidget.lua</code> 逐一 <code>loadfile()</code> 编译，全部返回 SYNTAX OK（仅编译不执行，不触发 require 依赖）。</p>
+    <p><span class="badge ok">已通过</span> <b>残留引用扫描</b>：全插件目录已无 <code>_G.BatteryGraphInstance</code> / <code>_G.SleepWakeTrackerInstance</code> / <code>dofile(</code> 残留。</p>
+    <p><span class="badge pending">待真机验证</span> <b>KOReader 加载与菜单</b>：受限于本环境无 KOReader 运行时，未能实机加载；逻辑已对照 PluginLoader 机制（init 由 new 调用、self.ui 经 attr 传入、插件经 registerModule 入 ui.modules 接收广播事件）静态核对。</p>
+    <p><span class="badge pending">待真机验证</span> <b>zip 形态</b>：建议打包为 zip 形态分发后再验证一次（本次重点消除的就是 zip 下的 dofile 雷）。</p>
+  </div>
+
+  <h2>历史时间线</h2>
+  <div class="tl">
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.6 — 更正原插件名称（Antigravity→BatteryGraph；补正 sleepwaketracker）</div>
+      <div class="body"><span class="tag">文案更正</span>「关于」弹窗与 _meta.lua author 字段将电量图表原插件名误写为 Antigravity，经用户核实原名应为 BatteryGraph，两处统一更正；随后在同版本（v1.0.6，不升版本）补正休眠/唤醒追踪器原名 sleepwaketracker。纯文案，无逻辑变化；版本 1.0.5 → 1.0.6，LuaJIT 编译通过。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.5 — 修复「关于」点击崩溃（漏 require InfoMessage）</div>
+      <div class="body"><span class="tag">崩溃修复</span>主菜单「关于」回调用 InfoMessage:new 弹窗，但 main.lua 顶部未 require ui/widget/infomessage，InfoMessage 为 nil → 崩溃（crash.log: main.lua:101 attempt to index global 'InfoMessage' (a nil value)）。修复：main.lua 顶部补 require。LuaJIT 编译通过；此类漏 require 属运行期崩溃，语法校验无法捕获，须靠 crash.log 栈定位。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.4 — 折线观感修复（充电灰线→黑色实线 + 去除断线）</div>
+      <div class="body"><span class="tag">观感修复</span>①充放电统一为黑色实线：原充电段用 COLOR_GRAY，在 KPW3 黑白屏上过淡不美观，改为充放电均 COLOR_BLACK 实心线；②折线连续绘制，移除 v1.0.3 引入的"相邻采样间隔&gt;6h 断开连线"逻辑（GAP_THRESHOLD），该逻辑在设备关停/长时间无采样时使中间段不画线，造成折线"断裂"观感；③图例由"放电(黑)/充电(灰)"双条改为单一"电量曲线"。改动仅 graphwidget.lua，LuaJIT 编译通过，待真机验证。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.3 — 代码审查修复（无新功能）</div>
+      <div class="body"><span class="tag">审查修复</span>针对电量统计/计算/展示审查发现的问题逐项最小改动：①KPW3 字形风险（视图菜单 ✓→&gt;、图例 ■ 改为文字、分隔 ─ 置空/改 hyphen）；②时间轴固定窗口 [cutoff,now]（今天=00:00起）且间隔&gt;6h 断开连线；③分段净变化改带符号累加，与全天首尾校准对齐；④getCapacity 优先于 getCapacityHW（防静默停记）；⑤周期采样不再每5分钟全量重读+排序（仅边界合并），onCloseDocument 合并落盘；⑥findNextEvent O(n²)→O(n) 预计算索引；⑦删死变量 legend_text。LuaJIT 5 模块编译通过，待真机验证。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">回滚 — v1.1.1 → v1.0.2（移除叠加视图）</div>
+      <div class="body"><span class="tag">回滚</span>用户对「折线 + 状态叠加」新视图效果不满意，回滚至 v1.0.2 基线。用 Backup/batterymonitor_v1.0.2/ 快照整体覆盖插件目录并删除 overlay.lua；Python md5 逐文件比对与备份逐字节一致、无 overlay 残留引用。_meta 版本号 1.0.0→1.0.2 对齐文档。v1.1.0/v1.1.1 改动（含崩溃修复）一并撤销。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.1.1 — 修复「折线 + 状态叠加」点击崩溃</div>
+      <div class="body"><span class="tag">崩溃修复</span>叠加视图打开即崩溃（crash.log: <code>overlay.lua:78 attempt to perform arithmetic on 'struct Color8' and 'number'</code>）。根因：<code>drawHatch</code> 调用漏传首个 <code>bb</code> 参数，导致颜色结构被当作数字参与减法。修复：调用处补回 <code>bb</code> 首参。同步将落后的 _meta.lua 版本号 1.0.0 纠正为 1.1.1。LuaJIT 语法校验通过，待真机验证。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.1.0 — 新增折线 + 状态叠加视图（overlay.lua）</div>
+      <div class="body"><span class="tag">新视图</span>新增 overlay.lua：复用 graphwidget 折线渲染，叠加休眠时段浅灰实色块 + 充电时段灰色斜纹（纯灰度，KPW3 友好，不依赖颜色）。折线统一黑色实线，状态由底色表达。新增菜单项「折线 + 状态叠加」，batterygraph_ctrl 新增 onShowOverlay 从 sleepwake 事件配对休眠时段并展示。图例改为两行纯文本、勾选标记 ✓→&gt; 避免 KPW3 豆腐块。v1.0.2 基线已快照至 Backup/batterymonitor_v1.0.2/ 以便回滚。LuaJIT 6 模块语法校验通过。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.2 — 健壮性加固 P0–P3</div>
+      <div class="body"><span class="tag">加固</span>P0 去除 KPW3 上渲染成豆腐块的 emoji/特殊字符；P1 新增 <code>mergeHistory</code> 并在 <code>recordPoint</code> 落盘前合并磁盘历史，修复 FileManager/Reader 双实例互相覆盖丢失阅读期间电量点；P2 删除两 ctrl 未调用的 <code>onDispatcherRegisterActions</code>/<code>addToMainMenu</code> 死代码（及无用 <code>require dispatcher</code>），CSV 导入/删今日后改 <code>reloadLastEvent()</code>；P3 钳负时长、拒 0 电量、graphwidget 优先 <code>self._monitor</code>、onResume 去冗余刷新。LuaJIT 5 模块语法校验通过，Dispatcher 仅 main.lua 残留，无 last_event 置 nil 残留。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.1 — 视图模式重构：周期窗口 → 时间窗</div>
+      <div class="body"><span class="tag">重构</span>移除 <code>cycle_discharge</code>/<code>cycle_charge</code> 周期视图（依赖 is_charging 跳变点，脆弱且冗余），改为 <code>today / 7d / 30d / 90d / 180d / 365d</code> 时间窗，默认 30d。保留充放电灰阶着色。改写 graphwidget.lua 与 batterygraph_ctrl.lua 的视图读取；LuaJIT 语法校验通过，全插件无 cycle/period_days 残留。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.0 — batterygraph + sleepwaketracker 合并为「电量监测」</div>
+      <div class="body"><span class="tag">合并</span>新建 main.lua 编排器；改写两 ctrl 去插件化、消除 dofile 跨插件雷；graphwidget 反向引用对齐；新增 _meta/README。LuaJIT 语法校验通过，原插件备份于 Backup/plugins/。英文名 <code>BatteryMonitor</code>（已确认不与插件树内 batterystat.koplugin 重名）。</div>
+    </div>
+    <div class="node">
+      <div class="date">（并入前）</div>
+      <div class="title">batterygraph v1.2.0 — 电量曲线（独立插件）</div>
+      <div class="body"><span class="tag">并入</span>连续电量折线图，含采样/归一化/休眠着色跳转逻辑。作为 batterygraph_ctrl.lua 并入。</div>
+    </div>
+    <div class="node">
+      <div class="date">（并入前）</div>
+      <div class="title">sleepwaketracker v1.0.0 — 休眠/唤醒追踪器（独立插件）</div>
+      <div class="body"><span class="tag">并入</span>休眠/唤醒事件记录与分段统计、CSV 导入导出。作为 sleepwake_ctrl.lua 并入。</div>
+    </div>
+  </div>
+
+  <footer>本文件由 WorkBuddy 依「插件修改须有专属 HTML 更新日志」约定生成 · 就近存档于项目 audit/ · 浅色主题（适配当前 IDE）</footer>
+</div>
+</body>
+</html>
