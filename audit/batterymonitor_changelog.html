@@ -349,6 +349,21 @@
     </ul>
   </div>
 
+  <div class="card">
+    <h2>段 ⑳ — 添加 Apache License 2.0 许可证与 NOTICE 文件（v1.0.6 合规轮）</h2>
+    <ul>
+      <li><b>动机</b>：合并插件此前无任何 LICENSE 文件，下载者无明确再分发/修改授权；用户要求补齐许可证。核查上游真实许可证：BatteryGraph（ura23）为 Apache 2.0（已抓取真实 LICENSE 原文，sha 261eeb9e…），sleepwaketracker（right9code）无 LICENSE 文件（<code>has_license: false</code>）。经用户确认，统一采用 Apache 2.0 并保留双原作者版权署名。</li>
+      <li><b>改动</b>：
+        <ul>
+          <li>仓库根新增 <code>LICENSE</code>：从 ura23/batterygraph.koplugin 抓取的真实 Apache 2.0 全文（11,357 B，sha 与上游一致），顶部追加版权归属段（ksaMask123 作为合并者 + 注明衍生自 ura23 与 right9code）。</li>
+          <li>仓库根新增 <code>NOTICE</code>：声明衍生来源、两上游版权与许可（Apache 2.0 / right9code 版权保留），满足 Apache 2.0 第 4(d) 条归属要求。</li>
+        </ul>
+      </li>
+      <li><b>影响</b>：GitHub 介绍页与发行版 zip 安装包均随附许可证；下载者可合法再分发/修改（须保留版权与 NOTICE）。</li>
+      <li><b>校验</b>：<code>git add LICENSE NOTICE</code> 已暂存；随 commit 推送；Release zip 将重打以含 LICENSE/NOTICE。</li>
+    </ul>
+  </div>
+
   <h2>动机（为什么合并）</h2>
   <div class="card">
     <p>两插件同属电量监控范畴且<b>功能互补不冗余</b>：batterygraph 给"电量怎么走"（连续曲线），sleepwaketracker 给"看书掉多少/待机掉多少"（分段统计）。二者原有"伪整合"但存在脆弱点——sleepwaketracker 用 <code>dofile</code> 硬编码拼路径跨插件加载 <code>graphwidget.lua</code>，一旦以 <b>zip 形态</b>分发，该路径不存在会静默失效。</p>
@@ -376,6 +391,11 @@
 
   <h2>历史时间线</h2>
   <div class="tl">
+    <div class="node">
+      <div class="date">2026-08-10</div>
+      <div class="title">v1.0.6 — 合规轮：添加 Apache 2.0 LICENSE + NOTICE</div>
+      <div class="body"><span class="tag">许可证/合规</span>补齐此前缺失的许可证。上游核查：BatteryGraph（ura23）为 Apache 2.0（抓取真实 LICENSE 原文 sha 261eeb9e…），sleepwaketracker（right9code）无 LICENSE 文件。经用户确认统一采用 Apache 2.0，仓库根新增 <code>LICENSE</code>（顶部附版权归属段）与 <code>NOTICE</code>（声明衍生自两上游并保留署名）。下载者可合法再分发/修改（须保留版权与 NOTICE）。版本仍 v1.0.6。</div>
+    </div>
     <div class="node">
       <div class="date">2026-08-10</div>
       <div class="title">v1.0.6 — 发行轮：GitHub Release + 可下载 zip 安装包</div>

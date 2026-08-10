@@ -1,0 +1,19 @@
+BatteryMonitor
+Copyright 2026 ksaMask123
+
+This product includes software derived from:
+
+1. BatteryGraph
+   Copyright ura23
+   Licensed under the Apache License, Version 2.0
+   https://github.com/ura23/batterygraph.koplugin
+
+2. sleepwaketracker
+   Copyright right9code
+   https://github.com/right9code/sleepwaketracker.koplugin
+   (The upstream repository ships no explicit LICENSE file; the original
+   author's copyright is retained. Redistribution of this combined work is
+   permitted under the Apache License 2.0, with attribution to the original
+   author preserved.)
+
+The full text of the Apache License 2.0 is provided in the LICENSE file.
