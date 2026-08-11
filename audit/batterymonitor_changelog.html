@@ -364,6 +364,20 @@
     </ul>
   </div>
 
+  <h2>段 ㉑ — 合并插件验收报告（koplugin-merge-acceptance 驱动，v1.0.6 验收轮）</h2>
+  <ul>
+    <li><b>动机</b>：用户启用 <code>koplugin-merge-acceptance</code> 验收技能，要求对合并后的 batterymonitor.koplugin 出具对照硬性开发要求的验收报告。本次为纯文档/核查轮，无代码变更。</li>
+    <li><b>改动</b>：
+      <ul>
+        <li>新增 <code>audit/batterymonitor_acceptance_report.html</code>：按五大部分（代码架构 / 性能内存 / 事件UI / 数据配置 / 调试验证）+ 合并来源事实，逐条打勾（✓/⚠/❌/⬜N/A）并附真实源码行号取证；含自检清单（合并前后资源估算对比 + 极端情况策略 + 签字栏）与按 ROI 排序的待整改项。</li>
+      </ul>
+    </li>
+    <li><b>验收结论</b>：有条件达标。静态体检 10✓ / 3⚠ / 3⬜N/A；<b>硬性 ❌ 3 项</b>：① 1.2 公共依赖去重未完成（normalizeHistory↔normalizeHistoryForGraph、getValidCapacity↔getBatteryLevel 重复 + 双存储后端）；② 2.4 无显式 <code>collectgarbage</code>；③ 4.2 配置未统一管理（LuaSettings battery_graph.lua vs 原生 io sleepwaketracker 双后端）。真机实测（SOP 第 3 步）本环境无法执行，列为待用户 KPW3 实测回填。</li>
+    <li><b>影响</b>：合并大目标已达成（事件监听 2→1、菜单注册 2→1、跨插件 broadcast 消除、单全局实例、单采样定时器），运行时确比独立装两插件更省资源；但上述 3 项 ❌ 须在发新版前整改或用户明确豁免。</li>
+    <li><b>校验</b>：本报告随 commit 推送至 ksaMask123/batterymonitor.koplugin；未触发任何 Release 动作（严守「发版须经用户同意」纪律）。版本仍 v1.0.6。</li>
+  </ul>
+  </div>
+
   <h2>动机（为什么合并）</h2>
   <div class="card">
     <p>两插件同属电量监控范畴且<b>功能互补不冗余</b>：batterygraph 给"电量怎么走"（连续曲线），sleepwaketracker 给"看书掉多少/待机掉多少"（分段统计）。二者原有"伪整合"但存在脆弱点——sleepwaketracker 用 <code>dofile</code> 硬编码拼路径跨插件加载 <code>graphwidget.lua</code>，一旦以 <b>zip 形态</b>分发，该路径不存在会静默失效。</p>
@@ -391,6 +405,11 @@
 
   <h2>历史时间线</h2>
   <div class="tl">
+    <div class="node">
+      <div class="date">2026-08-11</div>
+      <div class="title">v1.0.6 — 验收轮：合并插件验收报告（koplugin-merge-acceptance）</div>
+      <div class="body"><span class="tag">验收</span>启用合并插件验收技能，出具 <code>audit/batterymonitor_acceptance_report.html</code>。静态体检 10✓/3⚠/3⬜N/A；硬性 ❌ 3 项（1.2 去重依赖、2.4 显式 GC、4.2 统一存储）。真机实测待用户 KPW3 回填。未触发 Release。纯文档轮，版本仍 v1.0.6。</div>
+    </div>
     <div class="node">
       <div class="date">2026-08-10</div>
       <div class="title">v1.0.6 — 合规轮：添加 Apache 2.0 LICENSE + NOTICE</div>

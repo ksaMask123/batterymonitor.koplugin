@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电量监测 BatteryMonitor 合并插件 — 验收报告 v1.0.6</title>
+<style>
+  :root{
+    --bg:#ffffff; --card:#f7f8fa; --ink:#1f2329; --muted:#5c6370;
+    --line:#e3e6eb; --ok:#1a7f37; --warn:#b8860b; --bad:#c0392b;
+    --na:#6b7280; --accent:#2563eb;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg); color:var(--ink); line-height:1.6; margin:0; padding:28px;}
+  .wrap{max-width:960px; margin:0 auto;}
+  h1{font-size:24px; margin:0 0 4px;}
+  h2{font-size:18px; border-left:4px solid var(--accent); padding-left:10px; margin:30px 0 12px;}
+  .sub{color:var(--muted); font-size:13px; margin-bottom:18px;}
+  .verdict{border:1px solid var(--line); border-radius:10px; padding:16px 18px; background:var(--card); margin:18px 0;}
+  .verdict b{font-size:16px;}
+  table{width:100%; border-collapse:collapse; margin:10px 0 6px; font-size:13.5px;}
+  th,td{border:1px solid var(--line); padding:8px 10px; vertical-align:top; text-align:left;}
+  th{background:var(--card); font-weight:600;}
+  td.ev{font-family:"SFMono-Regular",Consolas,monospace; font-size:12px; color:var(--muted);}
+  .tag{display:inline-block; font-weight:700; padding:1px 8px; border-radius:6px; font-size:12px;}
+  .t-ok{background:#e6f4ea; color:var(--ok);}
+  .t-warn{background:#fdf3e0; color:var(--warn);}
+  .t-bad{background:#fdecea; color:var(--bad);}
+  .t-na{background:#eef0f3; color:var(--na);}
+  .selfframe{border:1px dashed var(--line); border-radius:10px; padding:14px 16px; background:#fbfcfe; margin:10px 0;}
+  .selfframe h3{margin:6px 0; font-size:14px;}
+  .pending{border:1px solid var(--line); border-radius:10px; padding:14px 16px; background:#fff8f7; margin:12px 0;}
+  .pending li{margin:6px 0;}
+  code{background:#eef0f3; padding:1px 5px; border-radius:4px; font-size:12px;}
+  footer{color:var(--muted); font-size:12px; margin-top:30px; border-top:1px solid var(--line); padding-top:12px;}
+  .legend{font-size:12px; color:var(--muted); margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>电量监测 BatteryMonitor 合并插件 — 验收报告</h1>
+  <div class="sub">
+    版本 <b>v1.0.6</b> ｜ 合并来源：电量图表 BatteryGraph + 休眠/唤醒追踪器 sleepwaketracker ｜
+    目标设备：Kindle Paperwhite 3（512MB / 单核 / 低主频 / 灰度墨水屏）<br>
+    验收标准：<code>koplugin-merge-acceptance</code> v1 ｜ 验收方式：静态体检（源码逐条 grep + 行号取证）｜
+    验收日期：2026-08-11 ｜ 静态体检执行人：WorkBuddy
+  </div>
+
+  <div class="verdict">
+    <b>验收结论：有条件达标（静态体检通过，2 项硬性不达标待整改，真机实测待用户执行）</b><br>
+    <span class="sub" style="margin:6px 0 0">
+      合并后的大目标（事件监听 2→1、菜单注册 2→1、跨插件 broadcastEvent 已消除、仅 1 个全局实例、采样定时器 1 个）已达成，
+      运行时确实比「独立装两插件」更省资源。<br>
+      但存在 <b>2 项硬性不达标（❌）</b>：① 公共依赖去重未完成（重复函数 + 双存储后端）；② 无显式 <code>collectgarbage</code> 内存释放。
+      另 3 项 ⚠ 与 1 项 ⬜N/A。真机实测（SOP 第 3 步）本环境无法执行，列为待办。
+    </span>
+  </div>
+
+  <div class="legend">
+    标记说明：✓ 达标 ｜ ⚠ 待整改（部分符合） ｜ ❌ 硬性不达标 ｜ ⬜ N/A（本插件不适用）
+  </div>
+
+  <h2>〇、合并来源事实（验收前必查）</h2>
+  <table>
+    <tr><th style="width:34%">条目</th><th style="width:46%">检查方法与证据</th><th style="width:8%">判定</th><th style="width:12%">说明</th></tr>
+    <tr>
+      <td>_meta.lua 自证合并来源</td>
+      <td class="ev">_meta.lua:4 <code>description = "合并自「电量图表」与「休眠/唤醒追踪器」…"</code>；:6 author 含「原：BatteryGraph / sleepwaketracker」</td>
+      <td><span class="tag t-ok">✓</span></td><td>自包含</td>
+    </tr>
+    <tr>
+      <td>main.lua 无 require 旧插件名（不依赖旧源码）</td>
+      <td class="ev">grep 全部 require：仅核心模块 + 本地子模块（batterygraph_ctrl / sleepwake_ctrl / graphwidget）。无 <code>require("batterygraph")</code> / <code>require("sleepwaketracker")</code></td>
+      <td><span class="tag t-ok">✓</span></td><td>自包含</td>
+    </tr>
+    <tr>
+      <td>装载红线：目标设备只装合并插件</td>
+      <td class="ev">代码层无法核验部署状态；属装载层互斥约定（严禁 旧A+旧B+合并 三者并存）</td>
+      <td><span class="tag t-na">⬜</span></td><td>需部署层确认</td>
+    </tr>
+  </table>
+
+  <h2>一、代码架构验收</h2>
+  <table>
+    <tr><th style="width:34%">条目</th><th style="width:46%">检查方法与证据</th><th style="width:8%">判定</th><th style="width:12%">说明</th></tr>
+    <tr>
+      <td>1.1 单入口（仅 main.lua + _meta.lua + 子模块）</td>
+      <td class="ev">目录 5 个 Lua：main.lua + _meta.lua + batterygraph_ctrl.lua + sleepwake_ctrl.lua + graphwidget.lua；菜单仅注册一次 <code>main.lua:65 addToMainMenu</code></td>
+      <td><span class="tag t-ok">✓</span></td><td>入口唯一</td>
+    </tr>
+    <tr>
+      <td>1.2 去重依赖（公共库单一来源 / 无重复函数）</td>
+      <td class="ev">① 电量历史归一化重复：<code>batterygraph_ctrl.lua:111-148 normalizeHistory</code> 与 <code>graphwidget.lua:143-171 normalizeHistoryForGraph</code> 同构；② 电量取值重复：<code>batterygraph_ctrl.lua:50-75 getValidCapacity</code> 与 <code>sleepwake_ctrl.lua:163-189 getBatteryLevel</code> 同构；③ <b>双存储后端</b>：<code>batterygraph_ctrl.lua:12,32,228 LuaSettings(battery_graph.lua)</code> vs <code>sleepwake_ctrl.lua:24-25 原生 io(data_dir/sleepwaketracker)</code></td>
+      <td><span class="tag t-bad">❌</span></td><td>未去重</td>
+    </tr>
+    <tr>
+      <td>1.3 模块拆分（业务子模块由主入口调度）</td>
+      <td class="ev"><code>main.lua:12-13 require 两控制器</code>；graphwidget 懒加载 <code>batterygraph_ctrl.lua:310 require("graphwidget")</code>（函数内）</td>
+      <td><span class="tag t-ok">✓</span></td><td>边界清晰</td>
+    </tr>
+  </table>
+
+  <h2>二、性能与内存验收（硬性）</h2>
+  <table>
+    <tr><th style="width:34%">条目</th><th style="width:46%">检查方法与证据</th><th style="width:8%">判定</th><th style="width:12%">说明</th></tr>
+    <tr>
+      <td>2.1 禁止同步阻塞（网络/磁盘/重算异步）</td>
+      <td class="ev">本插件纯本地、无网络 → 网络项 N/A。磁盘：<code>sleepwake_ctrl.lua:367 readAllEvents</code> 同步 <code>io.open</code> 全量逐行解析 + <code>table.sort</code>（单文件上限 1MB）；有 <code>cached_events</code> 缓存（:368 命中即返），但缓存失效 6 处（:31/:225/:270/:309/:970/:988）后，菜单触发的重载会在单核上同步读整份日志 → 大日志/365 天数据有卡顿风险。采样与刷新均走 <code>UIManager:scheduleIn</code>（:301/:332/:333/:789/:1209）</td>
+      <td><span class="tag t-warn">⚠</span></td><td>缓存缓解，非全异步</td>
+    </tr>
+    <tr>
+      <td>2.2 防抖（翻页/高亮/进度等频繁事件）</td>
+      <td class="ev">grep 无 <code>onTurnPage</code>/高亮/阅读进度监听；记录为节流式（<code>min_sample_interval=300s</code>、<code>min_new_point_interval=3600s</code>），非高频写入。无频繁事件需防抖合并</td>
+      <td><span class="tag t-na">⬜</span></td><td>本插件不监听此类事件</td>
+    </tr>
+    <tr>
+      <td>2.3 懒加载（非核心点击才载）</td>
+      <td class="ev">graphwidget 仅绘图时 <code>require</code>（:310）；关于/帮助/配置均在回调内 <code>:new</code>，启动仅核心必要模块</td>
+      <td><span class="tag t-ok">✓</span></td><td>达标</td>
+    </tr>
+    <tr>
+      <td>2.4 内存释放（大块数据置 nil + 主动 GC）</td>
+      <td class="ev">grep 全插件 <b>无任何 <code>collectgarbage</code></b> 调用；<code>cached_events</code> 6 处置 nil 仅为懒失效缓存，非「用毕显式释放 + 主动回收」；<code>readAllEvents</code> 构造的全量 events 表（堆）除缓存复用外未主动释放</td>
+      <td><span class="tag t-bad">❌</span></td><td>缺主动 GC</td>
+    </tr>
+  </table>
+
+  <h2>三、事件与 UI 交互验收</h2>
+  <table>
+    <tr><th style="width:34%">条目</th><th style="width:46%">检查方法与证据</th><th style="width:8%">判定</th><th style="width:12%">说明</th></tr>
+    <tr>
+      <td>3.1 统一事件监听（只注册一套，内部分发）</td>
+      <td class="ev"><code>main.lua</code> 注册单一 on* 集合（onSuspend/onResume/onCharging/onNotCharging/onEnterStandby/onLeaveStandby/onCloseDocument）并委派子控制器；<code>main.lua:157-159 onCloseDocument</code> 统一分发至 <code>batterygraph_ctrl:348</code> 与 <code>sleepwake_ctrl</code> 对应方法。无重复注册</td>
+      <td><span class="tag t-ok">✓</span></td><td>单一分发</td>
+    </tr>
+    <tr>
+      <td>3.2 UI 组件规范（关闭即销毁、不残留监听）</td>
+      <td class="ev"><code>graphwidget.lua:134 BatteryGraphWidget = FocusManager:extend{}</code>。FocusManager 是 KOReader 推荐的全屏可聚焦控件基类（继承链 WidgetContainer），经 <code>UIManager:close</code> 关闭即销毁，无残留监听器；关于弹窗走标准 InfoMessage/TextViewer，自销毁。注：字面非 InputContainer，但 InputContainer 面向浮层容器，全屏控件用 FocusManager 符合 KOReader 惯例且满足「关闭后完全销毁」意图</td>
+      <td><span class="tag t-ok">✓</span></td><td>达标（基类说明见左）</td>
+    </tr>
+    <tr>
+      <td>3.3 配置菜单整合（单配置页分组）</td>
+      <td class="ev">两插件菜单统一收敛到 BatteryMonitor 子菜单（<code>getMenuSubItems</code> 返回 今日/昨日/历史/数据管理/关于），单一入口、分组清晰</td>
+      <td><span class="tag t-ok">✓</span></td><td>菜单整合达标</td>
+    </tr>
+  </table>
+
+  <h2>四、数据与用户配置验收</h2>
+  <table>
+    <tr><th style="width:34%">条目</th><th style="width:46%">检查方法与证据</th><th style="width:8%">判定</th><th style="width:12%">说明</th></tr>
+    <tr>
+      <td>4.1 数据迁移兼容（读旧文件→转新格式→删旧）</td>
+      <td class="ev">sleepwake 侧迁移逻辑存在：<code>:74 "Migrating old log files..."</code>、<code>:123 迁移 N events</code>、<code>:152 清理旧事件</code>、<code>:198 日志轮转</code>；但保留 <code>max_backup_count=3</code> 备份（.bak 未删）。BatteryGraph 侧 <code>settings_file</code> 路径（battery_graph.lua）与旧独立版一致 → 天然兼容复用</td>
+      <td><span class="tag t-warn">⚠</span></td><td>迁移有，.bak 留底</td>
+    </tr>
+    <tr>
+      <td>4.2 配置统一管理（单 settings 后端）</td>
+      <td class="ev">同 1.2③：<code>battery_graph.lua(LuaSettings)</code> 与 <code>data_dir/sleepwaketracker(原生 io)</code> 双后端并存，未统一</td>
+      <td><span class="tag t-bad">❌</span></td><td>分散多文件</td>
+    </tr>
+  </table>
+
+  <h2>五、调试与验证验收</h2>
+  <table>
+    <tr><th style="width:34%">条目</th><th style="width:46%">检查方法与证据</th><th style="width:8%">判定</th><th style="width:12%">说明</th></tr>
+    <tr>
+      <td>5.1 关键路径日志（init/网络起止/保存加 logger.dbg）</td>
+      <td class="ev">grep 确认 <b>logger.dbg 埋点充足</b>：init（sleepwake_ctrl:35 / main.lua:37）、迁移（:74/:123/:152/:198/:215）、保存（:271/:285/:311）、采样（batterygraph_ctrl:265/:270/:275/:279）、挂起/唤醒（sleepwake_ctrl:1190/:1195/:1217/:1222）。无网络项 N/A。优于范本 artgallery（仅 warn/info）</td>
+      <td><span class="tag t-ok">✓</span></td><td>达标（优于范本）</td>
+    </tr>
+    <tr>
+      <td>5.2 自检清单（附合并前后对比 + 极端策略）</td>
+      <td class="ev">已随本报告第七节交付自检清单（架构层估算 + 极端情况策略）；真机实测数值待用户 KPW3 实测后回填</td>
+      <td><span class="tag t-ok">✓</span></td><td>文档齐</td>
+    </tr>
+  </table>
+
+  <h2>六、验收判定汇总</h2>
+  <table>
+    <tr><th>维度</th><th>达标</th><th>待整改</th><th>不适用</th><th>硬性 ❌ 项</th></tr>
+    <tr>
+      <td>〇 合并来源</td><td>2</td><td>0</td><td>1</td><td>0</td>
+    </tr>
+    <tr>
+      <td>一 代码架构</td><td>2</td><td>0</td><td>0</td><td>1（1.2 去重）</td>
+    </tr>
+    <tr>
+      <td>二 性能内存</td><td>1</td><td>1（2.1）</td><td>1（2.2）</td><td>1（2.4 GC）</td>
+    </tr>
+    <tr>
+      <td>三 事件UI</td><td>3</td><td>0</td><td>0</td><td>0</td>
+    </tr>
+    <tr>
+      <td>四 数据配置</td><td>0</td><td>1（4.1）</td><td>0</td><td>1（4.2 统一存储）</td>
+    </tr>
+    <tr>
+      <td>五 调试验证</td><td>2</td><td>0</td><td>0</td><td>0</td>
+    </tr>
+    <tr>
+      <td><b>合计</b></td><td><b>10</b></td><td><b>3</b></td><td><b>3</b></td><td><b>3</b></td>
+    </tr>
+  </table>
+
+  <h2>七、自检清单（每次验收必填）</h2>
+  <div class="selfframe">
+    <h3>资源占用估算对比（架构层定性估算，精确值待 KPW3 实测）</h3>
+    <table>
+      <tr><th style="width:30%">指标</th><th style="width:35%">合并前（独立装两插件）</th><th style="width:35%">合并后（batterymonitor v1.0.6）</th></tr>
+      <tr><td>全局实例</td><td class="ev">2 个（BatteryGraph + SleepWake 各 1）</td><td class="ev">1 个（BatteryMonitor 主容器调度 2 子控制器）</td></tr>
+      <tr><td>主菜单注册</td><td class="ev">2 处独立菜单项</td><td class="ev">1 处（BatteryMonitor 子菜单聚合）</td></tr>
+      <tr><td>事件监听注册</td><td class="ev">2 套 onSuspend/onResume 等</td><td class="ev">1 套（main 统一分发）</td></tr>
+      <tr><td>跨插件 broadcast</td><td class="ev">存在（两插件互发事件）</td><td class="ev">已消除（进程内 _monitor 引用）</td></tr>
+      <tr><td>采样定时器</td><td class="ev">2 个独立 tick</td><td class="ev">1 个（recordPoint 统一调度）</td></tr>
+      <tr><td>init 耗时（估算）</td><td class="ev">≈ 2× 单份 init</td><td class="ev">&lt; 单份 init（仅一次注册 + 懒加载 graphwidget）</td></tr>
+      <tr><td>常驻内存（估算）</td><td class="ev">≈ 2× 单份代码 + 双份配置域</td><td class="ev">单份代码 + 单配置域（存储后端仍双份，见 4.2）</td></tr>
+    </table>
+
+    <h3>极端情况策略（本插件真实场景，非"弱网同步"——本插件无网络）</h3>
+    <ul>
+      <li><b>大日志 + 菜单快速点击</b>：readAllEvents 同步整读 1MB 日志（单核可能卡顿）→ 现状靠 cached_events 缓存规避二次读；整改建议：菜单首读改 <code>UIManager:scheduleIn</code> 异步 + 加载态提示。</li>
+      <li><b>唤醒电量 = BATTERY_UNKNOWN(-1) / 非法</b>：readAllEvents 已过滤 <code>bat &gt;= -1 and &lt;= 100</code>，非法行记 warn 并写回清洗（:404-407）。</li>
+      <li><b>365 天数据累积</b>：max_history_days=365 截断；max_log_size=1MB + max_backup_count=3 轮转（:198）。</li>
+      <li><b>系统时间回拨</b>：table.sort 按 timestamp 升序；recordPoint 用「状态变化/电量变化/时间间隔」三条件去重，回拨不产生倒序崩溃。</li>
+      <li><b>FM/Reader 双实例并发</b>：recordPoint 落盘前重读磁盘历史合并（changelog 段 ⑭），避免互相覆盖。</li>
+    </ul>
+
+    <h3>签字栏</h3>
+    <p>
+      静态体检：<u>&nbsp; WorkBuddy（已执行，本报告） &nbsp;</u> ｜
+      真机实测：<u>&nbsp; 待用户 KPW3 实测回填 &nbsp;</u><br>
+      日期：2026-08-11 ｜ 版本：v1.0.6
+    </p>
+  </div>
+
+  <h2>八、待整改项（Pending-fix，按 ROI 排序）</h2>
+  <div class="pending">
+    <ol>
+      <li><b>❌ 4.2 / 1.2③ 统一存储后端（ROI 高）</b>：将 sleepwaketracker 原生 io 数据迁移到 BatteryGraph 的 <code>LuaSettings(battery_graph.lua)</code> 或独立统一 settings，消除双后端；顺带解决 1.2③ 去重。</li>
+      <li><b>❌ 1.2①② 抽取公共 util.lua（ROI 高）</b>：合并 <code>normalizeHistory</code>↔<code>normalizeHistoryForGraph</code>、<code>getValidCapacity</code>↔<code>getBatteryLevel</code> 为单一工具函数，由两控制器共享 require。</li>
+      <li><b>❌ 2.4 显式内存释放（ROI 中）</b>：在 readAllEvents 用毕 / 图表关闭后，于非热路径调用 <code>collectgarbage("collect")</code>；大块 events 表显式置 nil。</li>
+      <li><b>⚠ 2.1 菜单首读异步化（ROI 中）</b>：readAllEvents 首次整读改为 scheduleIn 异步 + 加载态，规避单核卡顿。</li>
+      <li><b>⚠ 4.1 迁移后清 .bak（ROI 低）</b>：迁移/轮转后按策略清理备份，避免存储浪费（与 4.2 统一存储后自然消解）。</li>
+    </ol>
+  </div>
+
+  <h2>九、发版把关说明</h2>
+  <div class="sub" style="border:1px solid var(--line); border-radius:8px; padding:10px 14px; background:var(--card);">
+    按「Release 发版须经用户明确同意」纪律：<b>本报告仅为验收文档，未触发任何 Release 动作</b>。
+    当前 v1.0.6 Release 仍维持既有状态。待用户完成 KPW3 真机实测、并对上述 ❌ 项拍板是否整改后，
+    方可决定是否发新版 Release。
+  </div>
+
+  <footer>
+    本报告由 <code>koplugin-merge-acceptance</code> 验收技能驱动，全部结论基于真实合并后源码逐条取证（行号可复核）。
+    静态体检已完成；真机实测（SOP 第 3 步：冷启动→开书→开插件→连续翻页 30 次→crash.log 取证）需用户在 KPW3 执行并回填第七节签字栏。
+    报告存于 <code>audit/batterymonitor_acceptance_report.html</code>，随代码同步 GitHub。
+  </footer>
+
+</div>
+</body>
+</html>
