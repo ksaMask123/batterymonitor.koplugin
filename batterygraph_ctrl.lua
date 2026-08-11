@@ -6,7 +6,7 @@ local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local _ = require("gettext")
 local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
-local util = require("util")
+local util = require("batterymonitor_util")
 
 local BatteryGraph = WidgetContainer:extend{
     name = "batterygraph",

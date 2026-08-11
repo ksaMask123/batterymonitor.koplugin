@@ -14,7 +14,7 @@ local Menu = require("ui/widget/menu")
 local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local _ = require("gettext")
-local normalizeHistory = require("util").normalizeHistory -- 去重自 util，整改 1.2①
+local normalizeHistory = require("batterymonitor_util").normalizeHistory -- 去重自 batterymonitor_util，整改 1.2①
 local Screen = Device.screen
 -- 缓存常用函数
 local math_abs = math.abs

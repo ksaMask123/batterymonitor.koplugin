@@ -9,7 +9,7 @@ local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
 local T = require("ffi/util").template
-local util = require("util")
+local util = require("batterymonitor_util")
 local Screen = Device.screen
 local PowerD = Device:getPowerDevice()
 

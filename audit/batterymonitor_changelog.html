@@ -425,6 +425,11 @@
   <div class="tl">
     <div class="node">
       <div class="date">2026-08-11</div>
+      <div class="title">v1.0.8 — 回归修复：消除 util.lua 与核心模块命名冲突</div>
+      <div class="body"><span class="tag">崩溃修复</span>真机加载崩溃（crash.log: <code>frontend/luasettings.lua:29: bad argument #1 to 'attributes' (string expected, got nil)</code>）。根因：v1.0.7 整改新增的插件本地 <code>util.lua</code> 与 KOReader 核心 <code>frontend/util.lua</code> 同名，插件目录在 require 解析顺序上劣后于核心路径，导致 <code>require("util")</code> 实际加载了核心 util（无 <code>SETTINGS_FILE</code> 字段）→ <code>settings_file = nil</code> → <code>LuaSettings:open(nil)</code> 崩溃。修复：重命名插件文件为 <code>batterymonitor_util.lua</code>，三处引用同步改为 <code>require("batterymonitor_util")</code>（batterygraph_ctrl / sleepwake_ctrl / graphwidget；sleepwake_ctrl 的 <code>require("ffi/util")</code> 核心引用保持不变）。6 模块 LuaJIT 语法校验通过；本类 require 解析错误语法校验无法捕获，须靠 crash.log 栈定位。版本 1.0.7 → 1.0.8。未触发 Release（待用户同意 + 真机复验）。</div>
+    </div>
+    <div class="node">
+      <div class="date">2026-08-11</div>
       <div class="title">v1.0.7 — 整改轮：去重依赖 / 统一存储 / 显式 GC</div>
       <div class="body"><span class="tag">整改</span>修复验收报告 3 项硬性 ❌：① 新增 util.lua 抽取 normalizeHistory 与 getValidCapacity，batterygraph_ctrl / graphwidget / sleepwake_ctrl 共享 require，删除 graphwidget 重复实现；② 容量历史从 battery_graph.lua 迁移到统一 batterymonitor_settings.lua（迁移后删旧文件），休眠事件日志因 append-only 1MB 体量保留原生 io 单文件（性能例外）；③ 非热路径（迁移/清理/导出/清空）大块表置 nil + collectgarbage。顺带 4.1 迁移后清 .bak、README 旧文件名引用更新。6 模块 luajit 语法校验通过。未触发 Release（待用户同意）。</div>
     </div>
