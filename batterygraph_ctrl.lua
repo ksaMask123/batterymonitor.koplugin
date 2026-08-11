@@ -5,11 +5,13 @@ local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local _ = require("gettext")
 local logger = require("logger")
+local lfs = require("libs/libkoreader-lfs")
+local util = require("util")
 
 local BatteryGraph = WidgetContainer:extend{
     name = "batterygraph",
     title = _("电量图表"),
-    settings_file = DataStorage:getSettingsDir() .. "/battery_graph.lua",
+    settings_file = util.SETTINGS_FILE, -- 整改 4.2：统一到 batterymonitor_settings.lua
     min_sample_interval = 300,    -- 基础采样间隔5分钟
     min_new_point_interval = 3600, -- 最少1小时新增1个采样点（保证曲线连续）
     capacity_change_threshold = 1, -- 电量变化阈值1%
@@ -30,6 +32,7 @@ function BatteryGraph:init()
         "settings=", tostring(self.settings_file))
 
     self.settings = LuaSettings:open(self.settings_file)
+    self:migrateLegacySettings() -- 整改 4.2/4.1：从旧 battery_graph.lua 迁移历史并删除旧文件
     self.history = self.settings:readSetting("history") or {ts={}, capacity={}, is_charging={}}
 
     -- 兼容旧数据格式：尽量迁移旧数组记录，而不是直接清空。
@@ -46,30 +49,15 @@ function BatteryGraph:init()
     self:scheduleNextRecord()
 end
 
--- 获取合法电量值（带校验）
+-- 获取合法电量值（带校验）—— 去重自 util.getValidCapacity（整改 1.2②）
 function BatteryGraph:getValidCapacity()
     if not PowerD then
         logger.warn("BatteryGraph: PowerD unavailable")
         return nil
     end
-    local ok, cap = pcall(function()
-        -- 优先 getCapacity（返回 0-100 百分比，语义稳定）；
-        -- 仅当其不可用时才回退 getCapacityHW（某些设备返回原始值，>100 会被下方范围检查拒绝）。
-        if PowerD.getCapacity then
-            return PowerD:getCapacity()
-        elseif PowerD.getCapacityHW then
-            return PowerD:getCapacityHW()
-        end
-    end)
-    cap = ok and tonumber(cap) or nil
-    if type(cap) ~= "number" then
+    local cap = util.getValidCapacity()
+    if cap == nil then
         logger.warn("BatteryGraph: Invalid battery capacity value")
-        return nil
-    end
-    -- Kindle 等设备刚唤醒时偶尔返回 0 或非法值；不要写入历史。
-    if cap <= 0 or cap > 100 then
-        logger.warn("BatteryGraph: Out-of-range battery capacity:", tostring(cap))
-        return nil
     end
     return cap
 end
@@ -103,48 +91,34 @@ function BatteryGraph:convertLegacyHistory(history)
     return out
 end
 
--- 规范化历史数据：
--- 1. 删除非法点；
--- 2. 按时间排序；
--- 3. 合并重复时间；
--- 4. 未充电且连续放电段内，抑制电量正向跳变，避免老设备电量回弹被画成“未充电却上升”。
+-- 规范化历史数据（去重自 util.normalizeHistory，整改 1.2①；保持方法签名供内部调用）
 function BatteryGraph:normalizeHistory(history)
-    history = history or {ts={}, capacity={}, is_charging={}}
-    history.ts = history.ts or {}
-    history.capacity = history.capacity or {}
-    history.is_charging = history.is_charging or {}
-    local temp = {}
-    for i = 1, #(history.ts or {}) do
-        local ts = tonumber(history.ts[i])
-        local cap = tonumber(history.capacity and history.capacity[i])
-        local charging = history.is_charging and history.is_charging[i] == true or false
-        if ts and cap and cap > 0 and cap <= 100 then
-            temp[#temp + 1] = {ts = ts, capacity = cap, is_charging = charging}
-        end
-    end
-    table.sort(temp, function(a, b)
-        if a.ts == b.ts then return (a.is_charging and 1 or 0) < (b.is_charging and 1 or 0) end
-        return a.ts < b.ts
-    end)
+    return util.normalizeHistory(history)
+end
 
-    local out = {ts={}, capacity={}, is_charging={}}
-    local function push(point)
-        local n = #out.ts
-        if n > 0 and out.ts[n] == point.ts then
-            out.capacity[n] = point.capacity
-            out.is_charging[n] = point.is_charging
-            return
-        end
-        if n > 0 and (not point.is_charging) and (out.is_charging[n] == false) and point.capacity > out.capacity[n] then
-            logger.dbg("BatteryGraph: Clamped non-charging battery rebound", point.capacity, "to", out.capacity[n])
-            point.capacity = out.capacity[n]
-        end
-        out.ts[#out.ts + 1] = point.ts
-        out.capacity[#out.capacity + 1] = point.capacity
-        out.is_charging[#out.is_charging + 1] = point.is_charging
+-- 从旧版独立插件的 battery_graph.lua 迁移容量历史到统一设置文件（整改 4.2/4.1）。
+-- 旧文件存在则读取其 history，与当前设置合并去重后写回新文件并删除旧文件；
+-- 全程 pcall 保护，迁移失败不影响启动。
+function BatteryGraph:migrateLegacySettings()
+    local old_file = DataStorage:getSettingsDir() .. "/battery_graph.lua"
+    if not lfs.attributes(old_file) then return end
+    local ok, old = pcall(function() return LuaSettings:open(old_file) end)
+    if not ok or not old then
+        logger.warn("BatteryGraph: Failed to open legacy settings, skipping migration")
+        return
     end
-    for _, point in ipairs(temp) do push(point) end
-    return out
+    local old_history = old:readSetting("history")
+    if old_history then
+        local cur = self.settings:readSetting("history") or {ts={}, capacity={}, is_charging={}}
+        local merged = self:mergeHistory(cur, old_history)
+        self.settings:saveSetting("history", merged)
+        self.settings:flush()
+        logger.dbg("BatteryGraph: Migrated legacy history from battery_graph.lua")
+    end
+    local removed, rerr = os.remove(old_file)
+    if not removed then
+        logger.warn("BatteryGraph: Failed to remove legacy settings file:", tostring(rerr))
+    end
 end
 
 function BatteryGraph:appendPoint(ts, capacity, is_charging)

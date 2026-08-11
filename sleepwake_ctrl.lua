@@ -9,6 +9,7 @@ local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 local _ = require("gettext")
 local T = require("ffi/util").template
+local util = require("util")
 local Screen = Device.screen
 local PowerD = Device:getPowerDevice()
 
@@ -121,8 +122,15 @@ function SleepWakeTracker:migrateOldLogs()
             end
             new_file:close()
             logger.dbg("SleepWakeTracker: Migrated", #all_events, "events to", new_log_path)
+            -- 整改 4.1：迁移成功后删除旧备份文件，避免存储浪费
+            for _, old_path in ipairs(old_files) do
+                os.remove(old_path .. ".bak")
+            end
         end
     end
+    -- 整改 2.4：旧日志整读产生的大块临时表，用毕显式释放并主动回收
+    all_events = nil
+    collectgarbage("collect")
 end
 
 function SleepWakeTracker:ensureDataDir()
@@ -151,13 +159,16 @@ function SleepWakeTracker:cleanOldEvents()
         self:writeAllEvents(new_events)
         logger.dbg("SleepWakeTracker: Cleaned", #all - #new_events, "old events")
     end
+    -- 整改 2.4：cleanOldEvents 仅在启动/低频触发，整读的大块 events 表用毕主动回收
+    all = nil
+    collectgarbage("collect")
 end
 
 function SleepWakeTracker:getLogFilePath()
     return self.data_dir .. "/" .. self.log_file
 end
 
--- 获取电量并做合法性校验
+-- 获取电量并做合法性校验（去重自 util.getValidCapacity，整改 1.2②）
 -- 注意：读不到电量时返回 nil，而不是 0。
 -- 0 往往是电源后端尚未就绪/读取失败的占位值，写入日志会造成巨大异常或把真实掉电抵消。
 function SleepWakeTracker:getBatteryLevel()
@@ -168,20 +179,9 @@ function SleepWakeTracker:getBatteryLevel()
         end
         return nil
     end
-
-    local cap
-    local ok, value = pcall(function()
-        -- 优先 getCapacity（0-100 百分比，语义稳定）；仅当不可用时回退 getCapacityHW。
-        if PowerD.getCapacity then
-            return PowerD:getCapacity()
-        elseif PowerD.getCapacityHW then
-            return PowerD:getCapacityHW()
-        end
-    end)
-    if ok then cap = tonumber(value) end
-
+    local cap = util.getValidCapacity()
     -- KOReader/设备刚唤醒时偶尔会返回 0 或非法值；不要把它当作真实电量落盘。
-    if not cap or cap <= 0 or cap > 100 then
+    if cap == nil then
         logger.warn("SleepWakeTracker: Invalid battery reading:", tostring(cap))
         return nil
     end
@@ -968,6 +968,8 @@ function SleepWakeTracker:confirmClearAll()
             self.last_event_type = nil
             self.last_event_ts = nil
             self.cached_events = nil
+            -- 整改 2.4：清除全部为低频用户操作，大块缓存用毕主动回收
+            collectgarbage("collect")
             UIManager:show(InfoMessage:new{text = _("所有历史已删除。"), timeout = 2})
         end
     })
@@ -1023,6 +1025,9 @@ function SleepWakeTracker:exportToCSV()
         count = count + 1
     end
     file:close()
+    -- 整改 2.4：导出为低频用户操作，整读的大块 events 表用毕主动回收
+    all = nil
+    collectgarbage("collect")
     UIManager:show(InfoMessage:new{text = T(_("已导出 %1 条事件到隐藏文件：\n%2"), count, csv_path), timeout = 5})
 end
 

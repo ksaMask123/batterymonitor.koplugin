@@ -96,7 +96,7 @@ KOReader 插件，把"电量曲线"与"休眠/唤醒追踪"合二为一，给墨
 ### 升级 / 卸载
 
 - 升级：覆盖同名目录即可，**已有数据文件保留**——电量采样数据与休眠/唤醒日志不会被覆盖清除。
-- 卸载：删除 `batterymonitor.koplugin/` 目录；`settings/battery_graph.lua`、`sleepwaketracker/all_events.log` 保留或手动删除皆可。
+- 卸载：删除 `batterymonitor.koplugin/` 目录；`settings/batterymonitor_settings.lua`、`sleepwaketracker/all_events.log` 保留或手动删除皆可。
 
 ---
 
@@ -146,7 +146,7 @@ KOReader 插件，把"电量曲线"与"休眠/唤醒追踪"合二为一，给墨
 
 | 内容 | 路径 |
 | --- | --- |
-| 电量曲线历史 | `koreader/settings/battery_graph.lua` |
+| 电量曲线历史（统一设置文件） | `koreader/settings/batterymonitor_settings.lua` |
 | 休眠/唤醒事件日志 | `koreader/<data_dir>/sleepwaketracker/all_events.log` |
 | 日志轮转备份 | 同目录 `all_events.log.bak.{1,2,3}` |
 | CSV 导出文件（隐藏） | 设备根目录下的 `.sleepwaketracker_export.csv` |

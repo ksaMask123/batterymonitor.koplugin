@@ -14,6 +14,7 @@ local Menu = require("ui/widget/menu")
 local InfoMessage = require("ui/widget/infomessage")
 local UIManager = require("ui/uimanager")
 local _ = require("gettext")
+local normalizeHistory = require("util").normalizeHistory -- 去重自 util，整改 1.2①
 local Screen = Device.screen
 -- 缓存常用函数
 local math_abs = math.abs
@@ -29,8 +30,6 @@ local PAD_TOP    = Size.padding.large * 2
 local PAD_BOTTOM = Size.padding.large * 5 -- 增加底部边距放图例
 local INNER_PAD  = Size.padding.default
 local DOT_MARGIN = Size.padding.large
--- 绘图前历史规范化函数：先前置声明，供 CanvasWidget:paintTo 使用
-local normalizeHistoryForGraph
 -- ===== 画布组件 =====
 local CanvasWidget = Widget:extend{
     history = {},
@@ -88,7 +87,7 @@ function CanvasWidget:paintTo(bb, x, y)
     -- 绘制坐标轴
     bb:paintRect(graph_x, graph_y + graph_h, graph_w, 2, Blitbuffer.COLOR_BLACK)
     bb:paintRect(graph_x, graph_y, 2, graph_h + 2, Blitbuffer.COLOR_BLACK)
-    local history = normalizeHistoryForGraph(self.history)
+    local history = normalizeHistory(self.history)
     -- 空数据处理
     if not history or not history.ts or #history.ts < 2 then
         -- 空状态提示文字居中绘制（修改：blitbuffer 无 paintText 成员，会 FFI 崩溃；
@@ -140,35 +139,7 @@ local BatteryGraphWidget = FocusManager:extend{
     _monitor        = nil, -- 构造时由 BatteryGraph 传入主插件实例；未传则回退到 _G.BatteryMonitorInstance
 }
 -- 绘图前规范化历史，避免旧数据时间倒序或未充电电量回弹导致折线错误上升
-normalizeHistoryForGraph = function(history)
-    history = history or {ts={}, capacity={}, is_charging={}}
-    local temp = {}
-    for i = 1, #(history.ts or {}) do
-        local ts = tonumber(history.ts[i])
-        local cap = tonumber(history.capacity and history.capacity[i])
-        local charging = history.is_charging and history.is_charging[i] == true or false
-        if ts and cap and cap > 0 and cap <= 100 then
-            temp[#temp + 1] = {ts = ts, capacity = cap, is_charging = charging}
-        end
-    end
-    table.sort(temp, function(a, b) return a.ts < b.ts end)
-    local out = {ts={}, capacity={}, is_charging={}}
-    for _, point in ipairs(temp) do
-        local n = #out.ts
-        if n > 0 and out.ts[n] == point.ts then
-            out.capacity[n] = point.capacity
-            out.is_charging[n] = point.is_charging
-        else
-            if n > 0 and (not point.is_charging) and (out.is_charging[n] == false) and point.capacity > out.capacity[n] then
-                point.capacity = out.capacity[n]
-            end
-            out.ts[#out.ts + 1] = point.ts
-            out.capacity[#out.capacity + 1] = point.capacity
-            out.is_charging[#out.is_charging + 1] = point.is_charging
-        end
-    end
-    return out
-end
+-- （直接使用 util.normalizeHistory，见上方 require）
 
 -- 计算当前视图的时间窗口边界 [start, end]（固定窗口，不随数据多少拉伸）
 function BatteryGraphWidget:getWindowBounds()
@@ -185,7 +156,7 @@ end
 
 -- 根据视图模式(时间窗)过滤历史数据：today=当天0点起, 7d/30d/90d/180d/365d=近N天
 function BatteryGraphWidget:getFilteredHistory()
-    local history = normalizeHistoryForGraph(self.history)
+    local history = normalizeHistory(self.history)
     if not history or not history.ts or #history.ts == 0 then
         return {ts={}, capacity={}, is_charging={}}
     end
@@ -333,7 +304,7 @@ function BatteryGraphWidget:updateCanvas()
 end
 -- 查找距离点击位置最近的数据点
 function BatteryGraphWidget:findNearestPoint(touch_x, touch_y)
-    local history = normalizeHistoryForGraph(self.filtered_history)
+    local history = normalizeHistory(self.filtered_history)
     if not history or not history.ts or #history.ts < 2 then return nil end
     local canvas_h = self.dimen.h - self.title_bar:getHeight()
     local graph_x = PAD_LEFT
@@ -369,7 +340,7 @@ function BatteryGraphWidget:findNearestPoint(touch_x, touch_y)
 end
 -- 显示数据点详情
 function BatteryGraphWidget:showPointDetail(idx)
-    local history = normalizeHistoryForGraph(self.filtered_history)
+    local history = normalizeHistory(self.filtered_history)
     if not idx or not history or not history.ts[idx] then return end
     local ts = history.ts[idx]
     local cap = history.capacity[idx]

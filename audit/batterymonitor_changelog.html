@@ -378,6 +378,24 @@
   </ul>
   </div>
 
+  <h2>段 ㉒ — 整改轮：去重依赖 / 统一存储 / 显式内存释放（v1.0.7）</h2>
+  <ul>
+    <li><b>动机</b>：落实合并插件验收报告（段 ㉑）点名的 3 项硬性 ❌——① 1.2 公共依赖去重未完成；② 2.4 无显式 <code>collectgarbage</code>；③ 4.2 配置/存储未统一管理（双后端）。同时顺带修 4.1（迁移残留 .bak）。</li>
+    <li><b>改动</b>：
+      <ul>
+        <li><b>新增 <code>util.lua</code>（公共库）</b>：抽取 <code>normalizeHistory(history)</code> 与 <code>getValidCapacity()</code> 两个纯函数 + <code>SETTINGS_FILE</code> 常量，由 batterygraph_ctrl / graphwidget / sleepwake_ctrl 三模块共享 <code>require("util")</code>，消除重复加载与逻辑漂移（整改 1.2①②）。</li>
+        <li><b>1.2 去重</b>：batterygraph_ctrl 的 <code>getValidCapacity</code> / <code>normalizeHistory</code> 改为委托 <code>util.*</code>（保留方法签名，原调用点不变）；graphwidget 删除重复的 <code>normalizeHistoryForGraph</code> 定义与前向声明，4 处调用改调 <code>util.normalizeHistory</code>（排序修正同 ts 充电点优先，更正确）；sleepwake_ctrl 的 <code>getBatteryLevel</code> 委托 <code>util.getValidCapacity</code>。</li>
+        <li><b>4.2 统一存储</b>：容量历史从旧 <code>settings/battery_graph.lua</code> 迁移到统一 <code>settings/batterymonitor_settings.lua</code>（新增 <code>migrateLegacySettings()</code>，全程 <code>pcall</code> 保护，合并去重后写回并删除旧文件）。休眠/唤醒事件日志因 append-only 单文件可达 1MB，<b>保留原生 io 单文件、不并入 LuaSettings</b>——否则每次落盘整文件重写会直接违背「严禁拖慢 KOReader」的硬要求；此点作为对 4.2 字面"单一文件"的合规例外，已在 <code>util.SETTINGS_FILE</code> 注释中写明权衡。</li>
+        <li><b>4.1 迁移后清 .bak</b>：<code>migrateOldLogs()</code> 迁移成功（新日志写完）后，删除旧 <code>YYYY-MM-DD.txt.bak</code> 备份，避免存储浪费；日志轮转的 <code>.bak.{1,2,3}</code> 属正常保留策略，不在清理范围。</li>
+        <li><b>2.4 显式内存释放</b>：在 <b>非热路径</b>（<code>migrateOldLogs</code> 整读旧日志后 / <code>cleanOldEvents</code> 清理后 / <code>exportToCSV</code> 导出后 / <code>confirmClearAll</code> 清空后）将大块临时表显式置 <code>nil</code> 并调用 <code>collectgarbage("collect")</code>。<code>readAllEvents</code> 因走 <code>cached_events</code> 缓存且可能处于菜单打开路径，<b>故意不在该处 GC</b>，以免单核设备卡顿（与"严禁拖慢"优先）。</li>
+        <li><b>文档</b>：README 两处旧设置文件名引用（卸载清单 / 数据存储表）更新为 <code>batterymonitor_settings.lua</code>；版本升 <code>v1.0.7</code>。</li>
+      </ul>
+    </li>
+    <li><b>影响</b>：运行行为保持；graphwidget 历史规范化排序修正（同 ts 充电点优先）属更正确而非回归；无网络 I/O / JSON，故硬性要求 2.2（异步网络）、2.3（大块 JSON 释放）按 N/A 处理。KPW3 真值源目录已同步 7 个文件（md5 一致）。</li>
+    <li><b>校验</b>：6 个 Lua 模块（含新增 util.lua）经 LuaJIT <code>loadfile</code> 语法校验全部通过；KOReader 运行期/加载期 nil 全局核验（koplugin-load-check）需 KPW3 真机执行，本环境无 runtime，列为待用户实测。<b>未触发任何 Release 动作</b>（严守「发版须经用户同意」纪律）——v1.0.6 Release 维持原状，待真机验证稳定后再议是否发 v1.0.7。</li>
+  </ul>
+  </div>
+
   <h2>动机（为什么合并）</h2>
   <div class="card">
     <p>两插件同属电量监控范畴且<b>功能互补不冗余</b>：batterygraph 给"电量怎么走"（连续曲线），sleepwaketracker 给"看书掉多少/待机掉多少"（分段统计）。二者原有"伪整合"但存在脆弱点——sleepwaketracker 用 <code>dofile</code> 硬编码拼路径跨插件加载 <code>graphwidget.lua</code>，一旦以 <b>zip 形态</b>分发，该路径不存在会静默失效。</p>
@@ -405,6 +423,11 @@
 
   <h2>历史时间线</h2>
   <div class="tl">
+    <div class="node">
+      <div class="date">2026-08-11</div>
+      <div class="title">v1.0.7 — 整改轮：去重依赖 / 统一存储 / 显式 GC</div>
+      <div class="body"><span class="tag">整改</span>修复验收报告 3 项硬性 ❌：① 新增 util.lua 抽取 normalizeHistory 与 getValidCapacity，batterygraph_ctrl / graphwidget / sleepwake_ctrl 共享 require，删除 graphwidget 重复实现；② 容量历史从 battery_graph.lua 迁移到统一 batterymonitor_settings.lua（迁移后删旧文件），休眠事件日志因 append-only 1MB 体量保留原生 io 单文件（性能例外）；③ 非热路径（迁移/清理/导出/清空）大块表置 nil + collectgarbage。顺带 4.1 迁移后清 .bak、README 旧文件名引用更新。6 模块 luajit 语法校验通过。未触发 Release（待用户同意）。</div>
+    </div>
     <div class="node">
       <div class="date">2026-08-11</div>
       <div class="title">v1.0.6 — 验收轮：合并插件验收报告（koplugin-merge-acceptance）</div>
